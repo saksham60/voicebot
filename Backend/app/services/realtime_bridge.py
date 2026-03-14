@@ -296,7 +296,7 @@ class RealtimeCallBridge:
             "type": "session.update",
             "session": {
                 "instructions": build_receptionist_prompt(self.settings),
-                "output_modalities": ["audio"],
+                "modalities": ["audio"],
                 "audio": {
                     "input": {
                         "format": {"type": "audio/pcmu"},
@@ -319,7 +319,13 @@ class RealtimeCallBridge:
         return {
             "type": "response.create",
             "response": {
-                "output_modalities": ["audio"],
+                "modalities": ["audio"],
+                "audio": {
+                    "output": {
+                        "format": {"type": "audio/pcmu"},
+                        "voice": self.settings.openai_realtime_voice,
+                    }
+                },
                 "instructions": (
                     "Begin the call now for Hotel Oman only. Do not ask for city, branch, property, area, or location. Greet the caller professionally, confirm this is for Hotel Oman, and ask for the check-in date."
                 ),
@@ -394,7 +400,15 @@ class RealtimeCallBridge:
             await self._send_openai_json(
                 {
                     "type": "response.create",
-                    "response": {"output_modalities": ["audio"]},
+                    "response": {
+                        "modalities": ["audio"],
+                        "audio": {
+                            "output": {
+                                "format": {"type": "audio/pcmu"},
+                                "voice": self.settings.openai_realtime_voice,
+                            }
+                        },
+                    },
                 }
             )
             if close_after_response:
