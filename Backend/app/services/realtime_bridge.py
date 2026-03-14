@@ -254,11 +254,24 @@ class RealtimeCallBridge:
                 self.last_assistant_item_id = str(item_id)
             return
 
-        if event_type == "response.output_audio.delta":
+        if event_type in {"response.output_audio.delta", "response.audio.delta"}:
             await self._forward_openai_audio_to_twilio(event, twilio_socket)
             return
 
-        if event_type == "response.output_audio_transcript.done":
+        if event_type in {"response.content_part.added", "response.content_part.done"}:
+            part = event.get("part", {})
+            if isinstance(part, dict) and part.get("audio"):
+                await self._forward_openai_audio_to_twilio(
+                    {
+                        "delta": part.get("audio"),
+                        "item_id": event.get("item_id"),
+                        "type": event_type,
+                    },
+                    twilio_socket,
+                )
+                return
+
+        if event_type in {"response.output_audio_transcript.done", "response.audio_transcript.done"}:
             transcript = str(event.get("transcript", "")).strip()
             if transcript and self.session is not None:
                 self.session.add_transcript(TranscriptSpeaker.ASSISTANT, transcript)
@@ -271,7 +284,7 @@ class RealtimeCallBridge:
                 )
             return
 
-        if event_type == "conversation.item.input_audio_transcription.completed":
+        if event_type in {"conversation.item.input_audio_transcription.completed", "input_audio_transcription.completed"}:
             transcript = str(event.get("transcript", "")).strip()
             if transcript and self.session is not None:
                 self.session.add_transcript(TranscriptSpeaker.CALLER, transcript)
@@ -307,6 +320,9 @@ class RealtimeCallBridge:
             )
             if self.session is not None and not self.session.end_reason:
                 self.session.end_reason = "OpenAI Realtime error"
+            return
+
+        self._log_unhandled_openai_event(event)
 
     async def _maybe_bootstrap_openai(self) -> None:
         if not self.openai_ready.is_set() or not self.twilio_started.is_set():
@@ -370,6 +386,7 @@ class RealtimeCallBridge:
                 stream_sid=self.stream_sid,
                 chunk_count=self.audio_chunks_forwarded,
                 chunk_size=len(payload),
+                source_event=event.get("type"),
             )
 
         item_id = event.get("item_id") or self.current_assistant_item_id
@@ -557,6 +574,16 @@ class RealtimeCallBridge:
             )
 
         log_event(self.logger, "openai.client_event", **fields)
+
+    def _log_unhandled_openai_event(self, event: dict[str, Any]) -> None:
+        event_type = str(event.get("type", "unknown"))
+        if event_type.startswith("response.") or event_type.startswith("conversation."):
+            log_event(
+                self.logger,
+                "openai.unhandled_event",
+                call_sid=self.call_sid,
+                event_type=event_type,
+            )
 
     def _log_openai_response_done(self, event: dict[str, Any]) -> None:
         response = event.get("response", {})
