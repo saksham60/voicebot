@@ -1,0 +1,17 @@
+.env
+.venv/
+.tmp/
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.DS_Store
+Thumbs.db
+data/*
+!data/.gitkeep

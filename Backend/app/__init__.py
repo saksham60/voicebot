@@ -1,0 +1,1 @@
+"""Hotel digital receptionist backend."""
