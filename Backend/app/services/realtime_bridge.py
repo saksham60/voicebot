@@ -55,6 +55,7 @@ class RealtimeCallBridge:
         self.current_assistant_item_id: str | None = None
         self.last_assistant_item_id: str | None = None
         self.mark_counter = 0
+        self.audio_chunks_forwarded = 0
         self.tool_executor = RealtimeToolExecutor(
             store=store,
             booking_provider=booking_provider,
@@ -284,7 +285,12 @@ class RealtimeCallBridge:
             return
 
         if event_type == "input_audio_buffer.speech_started":
-            await self._handle_barge_in(twilio_socket)
+            log_event(
+                self.logger,
+                "openai.speech_started_ignored",
+                call_sid=self.call_sid,
+                pending_audio_marks=len(self.pending_marks),
+            )
             return
 
         if event_type == "response.done":
@@ -350,6 +356,22 @@ class RealtimeCallBridge:
         payload = event.get("delta")
         if not payload:
             return
+        try:
+            payload = base64.b64encode(base64.b64decode(payload)).decode("utf-8")
+        except Exception:
+            return
+
+        self.audio_chunks_forwarded += 1
+        if self.audio_chunks_forwarded == 1 or self.audio_chunks_forwarded % 25 == 0:
+            log_event(
+                self.logger,
+                "twilio.audio_forwarded",
+                call_sid=self.call_sid,
+                stream_sid=self.stream_sid,
+                chunk_count=self.audio_chunks_forwarded,
+                chunk_size=len(payload),
+            )
+
         item_id = event.get("item_id") or self.current_assistant_item_id
         if item_id:
             self.last_assistant_item_id = str(item_id)
@@ -423,28 +445,6 @@ class RealtimeCallBridge:
 
         if self.close_after_assistant_reply and not self.pending_marks:
             await self._safe_close_twilio_socket(twilio_socket)
-
-    async def _handle_barge_in(self, twilio_socket: WebSocket) -> None:
-        if not self.stream_sid:
-            return
-        if self.pending_marks:
-            self.cleared_marks.update(self.pending_marks.keys())
-        await self._send_twilio_json(
-            twilio_socket,
-            {"event": "clear", "streamSid": self.stream_sid},
-        )
-
-        if self.last_assistant_item_id:
-            played_ms = self.played_audio_ms.get(self.last_assistant_item_id, 0)
-            if played_ms > 0:
-                await self._send_openai_json(
-                    {
-                        "type": "conversation.item.truncate",
-                        "item_id": self.last_assistant_item_id,
-                        "content_index": 0,
-                        "audio_end_ms": played_ms,
-                    }
-                )
 
     async def _handle_twilio_mark(
         self, message: dict[str, Any], twilio_socket: WebSocket
