@@ -316,7 +316,7 @@ class RealtimeCallBridge:
             "type": "session.update",
             "session": {
                 "instructions": build_receptionist_prompt(self.settings),
-                "modalities": ["audio"],
+                "modalities": ["audio", "text"],
                 "voice": self.settings.openai_realtime_voice,
                 "input_audio_format": "g711_ulaw",
                 "output_audio_format": "g711_ulaw",
@@ -333,7 +333,7 @@ class RealtimeCallBridge:
         return {
             "type": "response.create",
             "response": {
-                "modalities": ["audio"],
+                "modalities": ["audio", "text"],
                 "instructions": (
                     "Begin the call now for Hotel Oman only. Do not ask for city, branch, property, area, or location. Greet the caller professionally, confirm this is for Hotel Oman, and ask for the check-in date."
                 ),
@@ -409,7 +409,7 @@ class RealtimeCallBridge:
                 {
                     "type": "response.create",
                     "response": {
-                        "modalities": ["audio"],
+                        "modalities": ["audio", "text"],
                     },
                 }
             )
