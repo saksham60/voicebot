@@ -334,6 +334,8 @@ class RealtimeCallBridge:
             "type": "response.create",
             "response": {
                 "modalities": ["audio", "text"],
+                "voice": self.settings.openai_realtime_voice,
+                "output_audio_format": "g711_ulaw",
                 "instructions": (
                     "Begin the call now for Hotel Oman only. Do not ask for city, branch, property, area, or location. Greet the caller professionally, confirm this is for Hotel Oman, and ask for the check-in date."
                 ),
@@ -410,6 +412,8 @@ class RealtimeCallBridge:
                     "type": "response.create",
                     "response": {
                         "modalities": ["audio", "text"],
+                        "voice": self.settings.openai_realtime_voice,
+                        "output_audio_format": "g711_ulaw",
                     },
                 }
             )

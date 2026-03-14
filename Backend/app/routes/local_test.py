@@ -360,7 +360,7 @@ async def local_test_page(request: Request) -> HTMLResponse:
 
                 dc.send(JSON.stringify({{
                   type: "response.create",
-                  response: {{ modalities: ["audio", "text"] }},
+                  response: {{ modalities: ["audio", "text"], voice: config.voice }},
                 }}));
                 shouldAutoStop = closeAfterResponse;
               }}
@@ -430,6 +430,7 @@ async def local_test_page(request: Request) -> HTMLResponse:
                       type: "response.create",
                       response: {{
                         modalities: ["audio", "text"],
+                        voice: sessionData.voice,
                         instructions: "Begin the call now for Hotel Oman only. Do not ask for city, branch, property, area, or location. Greet the caller professionally, confirm this is for Hotel Oman, and ask for the check-in date."
                       }}
                     }}));
