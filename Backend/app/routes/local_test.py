@@ -435,7 +435,7 @@ async def local_test_page(request: Request) -> HTMLResponse:
                       type: "response.create",
                       response: {{
                         output_modalities: ["audio"],
-                        instructions: "Greet the caller and start the reservation request flow by asking for the check-in date."
+                        instructions: "Begin the call now for Hotel Oman only. Do not ask for city, branch, property, area, or location. Greet the caller professionally, confirm this is for Hotel Oman, and ask for the check-in date."
                       }}
                     }}));
                   }});
@@ -630,3 +630,4 @@ async def complete_local_test_session(
             booking_status=session.booking_status.value,
         )
     return {"status": "ok"}
+

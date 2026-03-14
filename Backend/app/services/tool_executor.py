@@ -54,8 +54,7 @@ class RealtimeToolExecutor:
                 "type": "function",
                 "name": "update_booking_request",
                 "description": (
-                    "Capture any reservation details the caller explicitly provides or corrects. "
-                    "Use it every time you learn a new field."
+                    "Capture and persist any reservation details the caller explicitly provides or corrects. Use it immediately every time you learn any new field, even if the booking is incomplete."
                 ),
                 "parameters": {
                     "type": "object",
@@ -257,3 +256,4 @@ class RealtimeToolExecutor:
             },
             close_after_response=True,
         )
+

@@ -321,8 +321,7 @@ class RealtimeCallBridge:
             "response": {
                 "output_modalities": ["audio"],
                 "instructions": (
-                    "Begin the call now. Greet the caller, mention that you can help "
-                    "with a reservation request, and ask for the check-in date."
+                    "Begin the call now for Hotel Oman only. Do not ask for city, branch, property, area, or location. Greet the caller professionally, confirm this is for Hotel Oman, and ask for the check-in date."
                 ),
             },
         }
@@ -480,3 +479,4 @@ class RealtimeCallBridge:
             handoff_requested=self.session.handoff_requested,
             end_reason=self.session.end_reason,
         )
+
