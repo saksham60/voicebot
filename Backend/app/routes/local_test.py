@@ -360,7 +360,7 @@ async def local_test_page(request: Request) -> HTMLResponse:
 
                 dc.send(JSON.stringify({{
                   type: "response.create",
-                  response: {{ modalities: ["audio"], audio: {{ output: {{ voice: config.voice }} }} }},
+                  response: {{ modalities: ["audio"] }},
                 }}));
                 shouldAutoStop = closeAfterResponse;
               }}
@@ -421,22 +421,15 @@ async def local_test_page(request: Request) -> HTMLResponse:
                         tools: sessionData.tools,
                         tool_choice: "auto",
                         modalities: ["audio"],
-                        audio: {{
-                          input: {{
-                            turn_detection: {{ type: "server_vad" }},
-                            transcription: {{ model: sessionData.transcription_model }}
-                          }},
-                          output: {{
-                            voice: sessionData.voice
-                          }}
-                        }}
+                        voice: sessionData.voice,
+                        input_audio_transcription: {{ model: sessionData.transcription_model }},
+                        turn_detection: {{ type: "server_vad" }}
                       }}
                     }}));
                     dc.send(JSON.stringify({{
                       type: "response.create",
                       response: {{
                         modalities: ["audio"],
-                        audio: {{ output: {{ voice: sessionData.voice }} }},
                         instructions: "Begin the call now for Hotel Oman only. Do not ask for city, branch, property, area, or location. Greet the caller professionally, confirm this is for Hotel Oman, and ask for the check-in date."
                       }}
                     }}));
