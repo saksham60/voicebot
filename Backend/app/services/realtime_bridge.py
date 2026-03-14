@@ -218,12 +218,31 @@ class RealtimeCallBridge:
 
         if event_type == "session.created":
             self.openai_ready.set()
-            log_event(self.logger, "openai.session_created", call_sid=self.call_sid)
+            session = event.get("session", {})
+            log_event(
+                self.logger,
+                "openai.session_created",
+                call_sid=self.call_sid,
+                session_id=session.get("id"),
+                model=session.get("model"),
+                voice=session.get("voice"),
+                modalities=session.get("modalities"),
+            )
             await self._maybe_bootstrap_openai()
             return
 
         if event_type == "session.updated":
-            log_event(self.logger, "openai.session_updated", call_sid=self.call_sid)
+            session = event.get("session", {})
+            log_event(
+                self.logger,
+                "openai.session_updated",
+                call_sid=self.call_sid,
+                voice=session.get("voice"),
+                modalities=session.get("modalities"),
+                input_audio_format=session.get("input_audio_format"),
+                output_audio_format=session.get("output_audio_format"),
+                tool_count=len(session.get("tools", [])),
+            )
             return
 
         if event_type in {"response.output_item.added", "response.output_item.created"}:
@@ -269,6 +288,7 @@ class RealtimeCallBridge:
             return
 
         if event_type == "response.done":
+            self._log_openai_response_done(event)
             await self._handle_response_done(event, twilio_socket)
             return
 
@@ -438,6 +458,112 @@ class RealtimeCallBridge:
         if self.close_after_assistant_reply and not self.pending_marks:
             await self._safe_close_twilio_socket(twilio_socket)
 
+    def _short_text(self, value: Any, limit: int = 240) -> str | None:
+        if value is None:
+            return None
+        text = value if isinstance(value, str) else json.dumps(value, default=str)
+        text = " ".join(text.split())
+        if len(text) <= limit:
+            return text
+        return f"{text[: limit - 3]}..."
+
+    def _summarize_output_items(
+        self, output_items: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        item_types: list[str] = []
+        assistant_messages: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
+
+        for item in output_items:
+            item_type = str(item.get("type", "unknown"))
+            item_types.append(item_type)
+
+            if item_type == "message":
+                parts: list[str] = []
+                for content in item.get("content", []):
+                    if not isinstance(content, dict):
+                        continue
+                    text = content.get("text") or content.get("transcript")
+                    if isinstance(text, str) and text.strip():
+                        parts.append(text.strip())
+                if parts:
+                    assistant_messages.append(" ".join(parts))
+                continue
+
+            if item_type == "function_call":
+                tool_calls.append(
+                    {
+                        "name": item.get("name"),
+                        "arguments": self._short_text(item.get("arguments"), 160),
+                    }
+                )
+
+        summary: dict[str, Any] = {"output_item_types": item_types}
+        if assistant_messages:
+            summary["assistant_text"] = self._short_text(
+                " | ".join(assistant_messages),
+                500,
+            )
+        if tool_calls:
+            summary["tool_calls"] = tool_calls
+        return summary
+
+    def _log_openai_client_event(self, payload: dict[str, Any]) -> None:
+        event_type = str(payload.get("type", "unknown"))
+        if event_type == "input_audio_buffer.append":
+            return
+
+        fields: dict[str, Any] = {"call_sid": self.call_sid, "event_type": event_type}
+
+        if event_type == "session.update":
+            session = payload.get("session", {})
+            fields.update(
+                {
+                    "modalities": session.get("modalities"),
+                    "voice": session.get("voice"),
+                    "input_audio_format": session.get("input_audio_format"),
+                    "output_audio_format": session.get("output_audio_format"),
+                    "tool_count": len(session.get("tools", [])),
+                    "instruction_preview": self._short_text(session.get("instructions")),
+                }
+            )
+        elif event_type == "response.create":
+            response = payload.get("response", {})
+            fields.update(
+                {
+                    "modalities": response.get("modalities"),
+                    "instruction_preview": self._short_text(response.get("instructions")),
+                }
+            )
+        elif event_type == "conversation.item.create":
+            item = payload.get("item", {})
+            fields.update(
+                {
+                    "item_type": item.get("type"),
+                    "call_id": item.get("call_id"),
+                    "output_preview": self._short_text(item.get("output")),
+                }
+            )
+        elif event_type == "conversation.item.truncate":
+            fields.update(
+                {
+                    "item_id": payload.get("item_id"),
+                    "audio_end_ms": payload.get("audio_end_ms"),
+                }
+            )
+
+        log_event(self.logger, "openai.client_event", **fields)
+
+    def _log_openai_response_done(self, event: dict[str, Any]) -> None:
+        response = event.get("response", {})
+        fields: dict[str, Any] = {
+            "call_sid": self.call_sid,
+            "response_id": response.get("id"),
+            "status": response.get("status"),
+        }
+        fields.update(self._summarize_output_items(response.get("output", [])))
+        log_event(self.logger, "openai.response_done", **fields)
+
     def _audio_duration_ms(self, payload: str) -> int:
         try:
             audio_bytes = base64.b64decode(payload)
@@ -448,6 +574,7 @@ class RealtimeCallBridge:
     async def _send_openai_json(self, payload: dict[str, Any]) -> None:
         if self._openai_socket is None:
             return
+        self._log_openai_client_event(payload)
         await self._openai_socket.send_json(payload)
 
     async def _send_twilio_json(
